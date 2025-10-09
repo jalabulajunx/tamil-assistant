@@ -33,11 +33,18 @@ ssh-keygen -f ~/.ssh/aur -t ed25519 -C "your-email@example.com"
 
 # Add public key to AUR account (copy ~/.ssh/aur.pub content)
 # Configure SSH client
+
+# For Bash/Zsh:
 cat >> ~/.ssh/config << EOF
 Host aur.archlinux.org
     IdentityFile ~/.ssh/aur
     User aur
 EOF
+
+# For Fish shell:
+echo "Host aur.archlinux.org
+    IdentityFile ~/.ssh/aur
+    User aur" >> ~/.ssh/config
 ```
 
 ### 3. Test Package Build
