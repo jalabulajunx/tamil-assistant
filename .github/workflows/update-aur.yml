@@ -1,0 +1,65 @@
+name: Update AUR Package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-aur:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout AUR repository
+      uses: actions/checkout@v4
+      with:
+        repository: jalabulajunx/tamil-assistant-aur
+        path: aur-repo
+        token: ${{ secrets.AUR_TOKEN }}
+    
+    - name: Checkout main repository
+      uses: actions/checkout@v4
+      with:
+        path: main-repo
+    
+    - name: Extract version
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        VERSION=${VERSION#v}  # Remove 'v' prefix
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Calculate checksum
+      id: checksum
+      run: |
+        # Download the release tarball
+        curl -L -o tarball.tar.gz "https://github.com/jalabulajunx/tamil-assistant/archive/v${{ steps.get_version.outputs.version }}.tar.gz"
+        CHECKSUM=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
+        echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+        echo "SHA256: $CHECKSUM"
+    
+    - name: Update PKGBUILD
+      run: |
+        cd aur-repo
+        
+        # Update version and checksum in PKGBUILD
+        sed -i "s/pkgver=.*/pkgver=${{ steps.get_version.outputs.version }}/" PKGBUILD
+        sed -i "s/pkgrel=.*/pkgrel=1/" PKGBUILD
+        sed -i "s/sha256sums=('.*')/sha256sums=('${{ steps.checksum.outputs.checksum }}')/" PKGBUILD
+        
+        # Update .SRCINFO
+        makepkg --printsrcinfo > .SRCINFO
+        
+        echo "Updated PKGBUILD:"
+        cat PKGBUILD
+    
+    - name: Commit and push to AUR
+      run: |
+        cd aur-repo
+        
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        git add PKGBUILD .SRCINFO
+        git commit -m "Update to v${{ steps.get_version.outputs.version }}"
+        git push origin master

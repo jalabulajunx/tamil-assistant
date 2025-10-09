@@ -1,0 +1,128 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.1.0, etc.
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper tagging
+    
+    - name: Extract version from tag
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        VERSION=${VERSION#v}  # Remove 'v' prefix
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Create source tarball
+      run: |
+        # Create tarball with proper naming for AUR
+        tar -czf tamil-assistant-${{ steps.get_version.outputs.version }}.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='*.pkg.tar.zst' \
+          --exclude='pkg' \
+          --exclude='src' \
+          --exclude='logs' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='config.ini' \
+          --exclude='.gitignore' \
+          --transform 's,^,tamil-assistant-${{ steps.get_version.outputs.version }}/,' \
+          *
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Generate changelog from git commits since last tag
+        if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1)
+          CHANGELOG=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
+        else
+          CHANGELOG=$(git log --pretty=format:"- %s" --reverse)
+        fi
+        
+        # Create release notes
+        cat > release_notes.md << EOF
+        ## Tamil Assistant v${{ steps.get_version.outputs.version }}
+        
+        AI-powered Tamil language learning companion for i3 window manager.
+        
+        ### Features
+        - Interactive Tamil text analysis with Gemini AI
+        - Poem summarization and contextual meaning
+        - Wikipedia links for Tamil personalities
+        - Configurable AI prompts
+        - i3 window manager integration
+        - Comprehensive logging and analytics
+        - AUR package support
+        
+        ### Installation
+        
+        **AUR Package (Recommended):**
+        \`\`\`bash
+        yay -S tamil-assistant
+        # or
+        paru -S tamil-assistant
+        \`\`\`
+        
+        **Manual Installation:**
+        \`\`\`bash
+        git clone https://github.com/jalabulajunx/tamil-assistant.git
+        cd tamil-assistant
+        pip install -r requirements.txt
+        cp config.ini.example ~/.config/tamil-assistant/config.ini
+        # Edit config.ini with your Gemini API key
+        \`\`\`
+        
+        ### Changes in this release:
+        $CHANGELOG
+        
+        ### Files
+        - \`tamil-assistant-${{ steps.get_version.outputs.version }}.tar.gz\` - Source code
+        EOF
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat release_notes.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag }}
+        release_name: Tamil Assistant v${{ steps.get_version.outputs.version }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: false
+    
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./tamil-assistant-${{ steps.get_version.outputs.version }}.tar.gz
+        asset_name: tamil-assistant-${{ steps.get_version.outputs.version }}.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Update PKGBUILD checksum
+      run: |
+        # Calculate SHA256 checksum for the tarball
+        CHECKSUM=$(sha256sum tamil-assistant-${{ steps.get_version.outputs.version }}.tar.gz | cut -d' ' -f1)
+        echo "SHA256 checksum: $CHECKSUM"
+        echo "Update PKGBUILD with: sha256sums=('$CHECKSUM')"
+        
+        # Create a comment with the checksum for easy copy-paste
+        echo "::notice title=PKGBUILD Update::Update your PKGBUILD with: sha256sums=('$CHECKSUM')"
