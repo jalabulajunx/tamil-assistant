@@ -327,7 +327,7 @@ python3 test_gemini.py
 python3 check_config.py
 
 # Launch application
-python3 tamil_sidepanel.py
+tamil-assistant
 ```
 
 ### Step 7: Configure i3 Window Manager
@@ -336,7 +336,7 @@ Add these lines to your `~/.config/i3/config`:
 
 ```bash
 # Tamil Assistant Integration
-bindsym $mod+y exec python3 /path/to/tamil-assistant/tamil_sidepanel.py
+bindsym $mod+y exec tamil-assistant-launcher
 
 # Window management
 for_window [class="TamilAssistant"] move scratchpad
