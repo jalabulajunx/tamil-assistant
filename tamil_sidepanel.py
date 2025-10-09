@@ -59,25 +59,52 @@ class TamilSidePanel(Gtk.Window):
         """Setup logging with datetime-based file splitting"""
         # Create logs directory in user's home directory if it doesn't exist
         log_dir = Path.home() / ".local" / "share" / "tamil-assistant" / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create session-specific log file
-        session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = log_dir / f"tamil_assistant_{session_timestamp}.log"
-        
-        # Configure logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler(sys.stdout)  # Also log to console
-            ]
-        )
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create session-specific log file
+            session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = log_dir / f"tamil_assistant_{session_timestamp}.log"
+            
+            # Configure logging with error handling
+            handlers = [logging.StreamHandler(sys.stdout)]  # Always log to console
+            
+            try:
+                # Try to add file handler
+                file_handler = logging.FileHandler(log_file)
+                handlers.append(file_handler)
+            except PermissionError:
+                # Fallback: try to create log file in /tmp if home directory fails
+                try:
+                    fallback_log = Path("/tmp") / f"tamil_assistant_{session_timestamp}.log"
+                    file_handler = logging.FileHandler(fallback_log)
+                    handlers.append(file_handler)
+                except Exception:
+                    # If all else fails, just use console logging
+                    pass
+            
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=handlers
+            )
+            
+        except Exception as e:
+            # If logging setup fails completely, use basic console logging
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=[logging.StreamHandler(sys.stdout)]
+            )
+            print(f"Warning: Could not set up file logging: {e}")
         
         self.logger = logging.getLogger('TamilAssistant')
         self.logger.info(f"Logging started - Session: {session_timestamp}")
-        self.logger.info(f"Log file: {log_file}")
+        if 'log_file' in locals():
+            self.logger.info(f"Log file: {log_file}")
+        else:
+            self.logger.info("Logging to console only")
 
     def show_error_dialog(self, title, message):
         """Show error dialog"""
