@@ -17,15 +17,64 @@ class Config:
         if config_path:
             self.config_path = Path(config_path)
         else:
-            # Default: look in script directory
-            script_dir = Path(__file__).parent
-            self.config_path = script_dir / 'config.ini'
+            # Default: look in user's config directory
+            user_config_dir = Path.home() / ".config" / "tamil-assistant"
+            self.config_path = user_config_dir / 'config.ini'
+            
+            # If user config doesn't exist, try to create it from template
+            if not self.config_path.exists():
+                self._create_user_config()
 
         # Load configuration
         self.load()
 
-        # Validate
-        self.validate()
+    def _create_user_config(self):
+        """Create user config from system template"""
+        try:
+            # Create user config directory
+            user_config_dir = self.config_path.parent
+            user_config_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Try to copy from system template
+            system_template = Path("/etc/tamil-assistant/config.ini.example")
+            if system_template.exists():
+                import shutil
+                shutil.copy2(system_template, self.config_path)
+                print(f"✓ Created user config from template: {self.config_path}")
+            else:
+                # Create a basic config if template not found
+                self._create_basic_config()
+        except Exception as e:
+            print(f"Warning: Could not create user config: {e}")
+            self._create_basic_config()
+    
+    def _create_basic_config(self):
+        """Create a basic config file"""
+        basic_config = """[gemini]
+api_key = your-gemini-api-key-here
+model = gemini-2.0-flash-exp
+
+[ui]
+window_width = 400
+window_height = 900
+font_tamil = Noto Sans Tamil
+font_size = 11
+
+[okular]
+dbus_service_pattern = org.kde.okular-*
+dbus_path = /okular
+
+[prompts]
+page_analysis_prompt_file = prompts/page_analysis.txt
+word_lookup_prompt_file = prompts/word_lookup.txt
+"""
+        try:
+            with open(self.config_path, 'w') as f:
+                f.write(basic_config)
+            print(f"✓ Created basic config: {self.config_path}")
+        except Exception as e:
+            print(f"Error creating basic config: {e}")
+            raise
 
     def load(self):
         """Load configuration from file"""
@@ -127,15 +176,22 @@ class Config:
     def _load_prompt_file(self, prompt_file):
         """Load prompt from file"""
         try:
-            # Try relative to config file directory first
-            prompt_path = self.config_path.parent / prompt_file
-            if prompt_path.exists():
-                with open(prompt_path, 'r', encoding='utf-8') as f:
+            # Try user prompts directory first
+            user_prompts_dir = Path.home() / ".config" / "tamil-assistant" / "prompts"
+            user_prompt_path = user_prompts_dir / Path(prompt_file).name
+            if user_prompt_path.exists():
+                with open(user_prompt_path, 'r', encoding='utf-8') as f:
                     return f.read().strip()
             
-            # Try relative to script directory
-            script_dir = Path(__file__).parent
-            prompt_path = script_dir / prompt_file
+            # Try system prompts directory
+            system_prompts_dir = Path("/usr/share/tamil-assistant/prompts")
+            system_prompt_path = system_prompts_dir / Path(prompt_file).name
+            if system_prompt_path.exists():
+                with open(system_prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+            
+            # Try relative to config file directory
+            prompt_path = self.config_path.parent / prompt_file
             if prompt_path.exists():
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     return f.read().strip()
