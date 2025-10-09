@@ -31,8 +31,15 @@ This guide walks you through submitting the Tamil Assistant to the Arch User Rep
 # Generate SSH key pair for AUR
 ssh-keygen -f ~/.ssh/aur -t ed25519 -C "your-email@example.com"
 
-# Add public key to AUR account (copy ~/.ssh/aur.pub content)
-# Configure SSH client
+# IMPORTANT: Add the PUBLIC key to your AUR account
+# 1. Copy the content of ~/.ssh/aur.pub
+cat ~/.ssh/aur.pub
+
+# 2. Go to https://aur.archlinux.org/account/
+# 3. Paste the public key content into "SSH Public Key" field
+# 4. Save your profile
+
+# Configure SSH client for aur.archlinux.org host
 
 # For Bash/Zsh:
 cat >> ~/.ssh/config << EOF
@@ -45,6 +52,10 @@ EOF
 echo "Host aur.archlinux.org
     IdentityFile ~/.ssh/aur
     User aur" >> ~/.ssh/config
+
+# Test SSH connection to AUR
+ssh -T aur@aur.archlinux.org
+# Should return: "Hi username! You've successfully authenticated with the key ..."
 ```
 
 ### 3. Test Package Build
