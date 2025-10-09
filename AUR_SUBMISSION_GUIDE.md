@@ -60,13 +60,14 @@ cp /path/to/tamil-assistant/PKGBUILD .
 cp /path/to/tamil-assistant/.SRCINFO .
 cp /path/to/tamil-assistant/LICENSE .
 cp /path/to/tamil-assistant/REUSE.toml .
+cp /path/to/tamil-assistant/tamil-assistant.install .
 cp /path/to/tamil-assistant/tamil-assistant-postinstall.sh .
 ```
 
 ### 5. Commit and Push
 ```bash
 # Add all files
-git add PKGBUILD .SRCINFO LICENSE REUSE.toml tamil-assistant-postinstall.sh
+git add PKGBUILD .SRCINFO LICENSE REUSE.toml tamil-assistant.install tamil-assistant-postinstall.sh
 
 # Commit with meaningful message
 git commit -m "Initial release of Tamil Assistant v1.0.0
@@ -92,6 +93,7 @@ tamil-assistant/
 ├── .SRCINFO                   # Package metadata
 ├── LICENSE                     # 0BSD license
 ├── REUSE.toml                  # License compliance
+├── tamil-assistant.install     # Package install hooks
 ├── tamil-assistant-postinstall.sh  # Post-install script
 └── (source files will be downloaded from GitHub)
 ```

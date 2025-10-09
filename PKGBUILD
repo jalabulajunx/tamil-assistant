@@ -25,6 +25,7 @@ optdepends=(
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/jalabulajunx/tamil-assistant/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')  # Replace with actual checksum when uploading
+install=tamil-assistant.install
 
 package() {
     cd "$pkgname-$pkgver"
