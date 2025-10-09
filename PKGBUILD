@@ -1,7 +1,7 @@
 # Maintainer: radnus <radnus@gmail.com>
 pkgname=tamil-assistant
-pkgver=1.0.5
-pkgrel=4
+pkgver=1.0.6
+pkgrel=1
 pkgdesc="AI-powered Tamil language learning companion for i3 window manager"
 arch=('any')
 url="https://github.com/jalabulajunx/tamil-assistant"
@@ -67,8 +67,7 @@ package() {
     install -Dm644 prompts/page_analysis.txt "$pkgdir/usr/share/tamil-assistant/prompts/"
     install -Dm644 prompts/word_lookup.txt "$pkgdir/usr/share/tamil-assistant/prompts/"
     
-    # Create logs directory
-    install -dm755 "$pkgdir/var/log/tamil-assistant"
+    # Note: Logs directory is now created in user's ~/.local/share/tamil-assistant/logs
     
     # Install post-install script
     install -Dm755 tamil-assistant-postinstall.sh "$pkgdir/usr/share/tamil-assistant/postinstall.sh"

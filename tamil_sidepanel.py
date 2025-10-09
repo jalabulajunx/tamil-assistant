@@ -57,9 +57,9 @@ class TamilSidePanel(Gtk.Window):
 
     def setup_logging(self):
         """Setup logging with datetime-based file splitting"""
-        # Create logs directory if it doesn't exist
-        log_dir = Path(__file__).parent / "logs"
-        log_dir.mkdir(exist_ok=True)
+        # Create logs directory in user's home directory if it doesn't exist
+        log_dir = Path.home() / ".local" / "share" / "tamil-assistant" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
         
         # Create session-specific log file
         session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
