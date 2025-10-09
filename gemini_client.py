@@ -11,7 +11,7 @@ import io
 import html
 import logging
 from PIL import Image
-from config_manager import get_config
+from tamil_assistant.config_manager import get_config
 
 class TamilWord:
     def __init__(self, tamil_word, literal, contextual, sentence):

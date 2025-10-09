@@ -4,7 +4,7 @@ Check and display configuration
 """
 
 import sys
-from config_manager import get_config
+from tamil_assistant.config_manager import get_config
 
 def main():
     print("Tamil Assistant - Configuration Check")

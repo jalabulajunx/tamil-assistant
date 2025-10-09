@@ -16,9 +16,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from config_manager import get_config
-from okular_interface import OkularInterface
-from gemini_client import GeminiClient, TamilWord
+from tamil_assistant.config_manager import get_config
+from tamil_assistant.okular_interface import OkularInterface
+from tamil_assistant.gemini_client import GeminiClient, TamilWord
 
 class TamilSidePanel(Gtk.Window):
     def __init__(self):

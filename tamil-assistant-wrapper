@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""
+Tamil Assistant Wrapper Script
+This script ensures proper Python path setup for the Tamil Assistant application
+"""
+
+import sys
+import os
+
+# Add the Tamil Assistant package to Python path
+def add_package_to_path():
+    """Add the Tamil Assistant package to Python path"""
+    # Try to find the package in the system site-packages
+    import site
+    for site_dir in site.getsitepackages():
+        tamil_assistant_path = os.path.join(site_dir, 'tamil_assistant')
+        if os.path.exists(tamil_assistant_path):
+            parent_dir = os.path.dirname(tamil_assistant_path)
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            break
+
+# Add package to path before importing
+add_package_to_path()
+
+# Now import and run the main application
+if __name__ == '__main__':
+    try:
+        from tamil_assistant.tamil_sidepanel import main
+        main()
+    except ImportError as e:
+        print(f"Error importing Tamil Assistant: {e}")
+        print("Please ensure the Tamil Assistant package is properly installed.")
+        sys.exit(1)
