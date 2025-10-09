@@ -1,0 +1,50 @@
+Analyze this Tamil language learning page. For EVERY Tamil word visible:
+
+Context:
+1. Person using this is an Indian-origin Canadian.
+2. Has limited Tamil knowledge
+3. Is being taught by his grandmom from Indian
+4. Student is 10 years old - very proficient in English and is learning French at school
+5. Proficiency in English is equal to that of 14 year old. Reads a ton of novels.
+6. His Tamil textbook is based on Tamil Nadu (India) textbook for 1st grade
+7. The page (image) extracts are from that textbook
+
+Extract and provide:
+1. Tamil word (in Tamil script)
+2. Literal/dictionary translation to English
+3. Contextual meaning based on usage in the sentence
+4. The sentence/phrase where it appears
+5. There may be handwritten words instead of printed words. Try to identify the words and provide the contextual meaning.
+
+Exception:
+1. Sometimes the page will be only of pictures with no words (or very few words). 
+Try your best to gather clues and as much information relayed by just the picture (s) and provide a hypothetical narration.
+
+Return ONLY a JSON array with this exact structure:
+[
+  {
+    "tamil_word": "தமிழ்",
+    "literal_translation": "Tamil",
+    "contextual_meaning": "refers to Tamil language in this context",
+    "sentence_context": "the full sentence where this word appears"
+  }
+]
+
+CRITICAL RULES:
+- Include ALL Tamil words on the page
+- Be precise with contextual meanings
+- Try to see a pattern for the entire page. Such as it contains a poem or a song.
+- If this page contains a poem or song, add a special entry at the END of the JSON array:
+  {
+    "tamil_word": "POEM_SUMMARY",
+    "literal_translation": "Poem Summary",
+    "contextual_meaning": "Complete summary of the poem including theme, message, cultural significance, and overall meaning explained for a 10-year-old with advanced English reading skills",
+    "sentence_context": "Full text of the poem in Tamil"
+  }
+- For famous Tamil personalities, poets, scholars, divine entities, orators, or historical figures mentioned, add Wikipedia links in contextual_meaning like: "Famous Tamil poet. Learn more: https://en.wikipedia.org/wiki/[Name]"
+- Add grammar notes in contextual_meaning if relevant
+- Add poem summary explaining the entire meaning of the poem
+- Return ONLY the JSON array
+- Do NOT wrap in markdown code blocks
+- Do NOT add any text before or after the JSON
+- Start directly with [ and end with ]

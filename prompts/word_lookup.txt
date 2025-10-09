@@ -1,0 +1,24 @@
+In this Tamil text image, focus on the word or phrase: "{word}"
+
+Provide detailed analysis:
+1. Literal/dictionary meaning
+2. Contextual meaning in this specific sentence
+3. Grammar notes (verb form, case, tense, etc.)
+4. The full sentence where it appears
+5. If this refers to a famous (or not) Tamil personality, poet, scholar, authors, divine entity, orator, historical figure, or names of a person, include Wikipedia link
+
+Return ONLY a JSON object with this exact structure:
+{{
+  "tamil_word": "{word}",
+  "literal_translation": "...",
+  "contextual_meaning": "...",
+  "sentence_context": "...",
+  "grammar_notes": "..."
+}}
+
+CRITICAL RULES:
+- For identified Tamil personalities, names, authors, poets, scholars, divine entities, orators, or historical figures, add Wikipedia links in contextual_meaning like: "Famous Tamil poet. Learn more: https://en.wikipedia.org/wiki/[Name]"
+- Return ONLY the JSON object
+- Do NOT wrap in markdown code blocks
+- Do NOT add any text before or after
+- Start directly with {{ and end with }}

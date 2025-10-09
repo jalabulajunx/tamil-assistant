@@ -1,0 +1,19 @@
+[gemini]
+# Get your API key from: https://aistudio.google.com/apikey
+api_key = YOUR_API_KEY_HERE
+model = gemini-2.5-flash-lite
+
+[ui]
+window_width = 400
+window_height = 900
+font_tamil = Noto Sans Tamil
+font_size = 11
+
+[okular]
+dbus_service_pattern = org.kde.okular-*
+dbus_path = /okular
+
+[prompts]
+# Paths to prompt files (relative to config directory)
+page_analysis_prompt_file = prompts/page_analysis.txt
+word_lookup_prompt_file = prompts/word_lookup.txt
