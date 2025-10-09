@@ -1,6 +1,6 @@
 # Maintainer: radnus <radnus@gmail.com>
 pkgname=tamil-assistant
-pkgver=1.0.4
+pkgver=1.0.5
 pkgrel=4
 pkgdesc="AI-powered Tamil language learning companion for i3 window manager"
 arch=('any')
