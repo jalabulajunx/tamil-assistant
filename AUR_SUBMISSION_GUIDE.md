@@ -73,34 +73,152 @@ makepkg -i --noconfirm
 git clone ssh://aur@aur.archlinux.org/tamil-assistant.git
 cd tamil-assistant
 
-# Copy package files
-cp /path/to/tamil-assistant/PKGBUILD .
-cp /path/to/tamil-assistant/.SRCINFO .
-cp /path/to/tamil-assistant/LICENSE .
-cp /path/to/tamil-assistant/REUSE.toml .
-cp /path/to/tamil-assistant/tamil-assistant.install .
-cp /path/to/tamil-assistant/tamil-assistant-postinstall.sh .
+# Copy package files from your project
+cp /home/radnus/Projects/tamil-assistant/PKGBUILD .
+cp /home/radnus/Projects/tamil-assistant/.SRCINFO .
+cp /home/radnus/Projects/tamil-assistant/LICENSE .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant.install .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant-postinstall.sh .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant.desktop .
+cp /home/radnus/Projects/tamil-assistant/readme.md .
+
+# Add and commit files
+git add .
+git commit -m "Initial package submission"
+git push origin master
 ```
 
-### 5. Commit and Push
+### 5. Verify AUR Submission
+```bash
+# Check if package appears on AUR
+# Visit: https://aur.archlinux.org/packages/tamil-assistant
+
+# Test installation from AUR
+yay -S tamil-assistant
+# or
+paru -S tamil-assistant
+```
+
+### 6. Update Package (Future Releases)
+```bash
+# When you have a new version:
+
+# 1. Update PKGBUILD in your main project
+# Edit PKGBUILD: change pkgver=1.0.0 to pkgver=1.0.1
+# Update .SRCINFO: makepkg --printsrcinfo > .SRCINFO
+
+# 2. Update AUR repository
+cd ~/tamil-assistant  # Your AUR repo
+git pull origin master
+
+# 3. Copy updated files
+cp /home/radnus/Projects/tamil-assistant/PKGBUILD .
+cp /home/radnus/Projects/tamil-assistant/.SRCINFO .
+
+# 4. Commit and push
+git add PKGBUILD .SRCINFO
+git commit -m "Update to v1.0.1"
+git push origin master
+```
+
+## 📋 **Complete Step-by-Step Submission Process**
+
+### **Step 1: Prepare Your Package**
+```bash
+# Ensure all files are ready
+cd /home/radnus/Projects/tamil-assistant
+
+# Update PKGBUILD version if needed
+# Edit PKGBUILD: pkgver=1.0.1
+
+# Generate .SRCINFO
+makepkg --printsrcinfo > .SRCINFO
+
+# Test build
+makepkg -s --noconfirm
+```
+
+### **Step 2: Create AUR Repository**
+```bash
+# Clone empty AUR repository
+git clone ssh://aur@aur.archlinux.org/tamil-assistant.git
+cd tamil-assistant
+
+# Copy all required files
+cp /home/radnus/Projects/tamil-assistant/PKGBUILD .
+cp /home/radnus/Projects/tamil-assistant/.SRCINFO .
+cp /home/radnus/Projects/tamil-assistant/LICENSE .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant.install .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant-postinstall.sh .
+cp /home/radnus/Projects/tamil-assistant/tamil-assistant.desktop .
+cp /home/radnus/Projects/tamil-assistant/readme.md .
+cp /home/radnus/Projects/tamil-assistant/REUSE.toml .
+```
+
+### **Step 3: Submit to AUR**
 ```bash
 # Add all files
-git add PKGBUILD .SRCINFO LICENSE REUSE.toml tamil-assistant.install tamil-assistant-postinstall.sh
+git add .
 
-# Commit with meaningful message
-git commit -m "Initial release of Tamil Assistant v1.0.0
+# Commit with descriptive message
+git commit -m "Initial package submission for Tamil Assistant v1.0.1
 
 - AI-powered Tamil language learning companion
-- Integrates with Okular PDF viewer via D-Bus
-- i3 window manager integration with scratchpad
-- Google Gemini API for contextual translations
-- Comprehensive logging and session management
-- Clickable Wikipedia links for Tamil entities
-- Poem analysis and summarization features"
+- i3 window manager integration
+- Configurable prompts and comprehensive logging
+- AUR package ready"
 
 # Push to AUR
 git push origin master
 ```
+
+### **Step 4: Verify Submission**
+```bash
+# Check AUR website
+# Visit: https://aur.archlinux.org/packages/tamil-assistant
+
+# Test installation
+yay -S tamil-assistant
+# or
+paru -S tamil-assistant
+```
+
+### **Step 5: Test Installation**
+```bash
+# Install the package
+sudo pacman -S tamil-assistant
+
+# Verify installation
+which tamil-assistant
+ls -la /usr/bin/tamil-assistant*
+
+# Test the application
+tamil-assistant --help
+```
+
+## 🔄 **Updating Your Package**
+
+When you release a new version:
+
+### **Method 1: Manual Update**
+```bash
+# 1. Update main project
+cd /home/radnus/Projects/tamil-assistant
+# Edit PKGBUILD: pkgver=1.0.2
+makepkg --printsrcinfo > .SRCINFO
+
+# 2. Update AUR
+cd ~/tamil-assistant
+git pull origin master
+cp /home/radnus/Projects/tamil-assistant/PKGBUILD .
+cp /home/radnus/Projects/tamil-assistant/.SRCINFO .
+git add PKGBUILD .SRCINFO
+git commit -m "Update to v1.0.2"
+git push origin master
+```
+
+### **Method 2: Automated Update (Future)**
+The GitHub Actions workflow can be configured to automatically update AUR when you create releases.
 
 ## 📦 Package Structure
 
