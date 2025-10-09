@@ -11,6 +11,8 @@ import sys
 import signal
 import logging
 import os
+import argparse
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -525,7 +527,87 @@ class TamilSidePanel(Gtk.Window):
         self.hide()
         return True  # Prevent actual close
 
+def setup_user_config():
+    """Set up user configuration files"""
+    print("🔧 Setting up Tamil Assistant for current user...")
+    
+    # Get user home directory
+    user_home = Path.home()
+    user_config_dir = user_home / ".config" / "tamil-assistant"
+    user_prompts_dir = user_config_dir / "prompts"
+    user_log_dir = user_home / ".local" / "share" / "tamil-assistant" / "logs"
+    
+    # Create directories
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    user_prompts_dir.mkdir(parents=True, exist_ok=True)
+    user_log_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Copy default config if it doesn't exist
+    config_file = user_config_dir / "config.ini"
+    if not config_file.exists():
+        print("📝 Creating user configuration...")
+        shutil.copy("/etc/tamil-assistant/config.ini.example", config_file)
+        print(f"✅ Configuration created at {config_file}")
+        print("⚠️  Please edit this file and add your Google Gemini API key!")
+        print("   Get your API key from: https://aistudio.google.com/apikey")
+    else:
+        print(f"ℹ️  User configuration already exists at {config_file}")
+    
+    # Copy prompt templates if they don't exist
+    if not any(user_prompts_dir.iterdir()):
+        print("📝 Creating user prompt templates...")
+        shutil.copytree("/usr/share/tamil-assistant/prompts", user_prompts_dir, dirs_exist_ok=True)
+        print(f"✅ Prompt templates created at {user_prompts_dir}")
+        print("ℹ️  You can customize these prompts for your specific needs")
+    else:
+        print(f"ℹ️  User prompt templates already exist at {user_prompts_dir}")
+    
+    print(f"📁 Logs directory created at {user_log_dir}")
+    
+    # Check i3 config
+    i3_config = user_home / ".config" / "i3" / "config"
+    if i3_config.exists():
+        print("🔍 Checking i3 configuration...")
+        with open(i3_config, 'r') as f:
+            content = f.read()
+            if "tamil-assistant" in content:
+                print("ℹ️  Tamil Assistant bindings already exist in i3 config")
+            else:
+                print("⚠️  Tamil Assistant bindings not found in i3 config")
+                print("📋 Add these lines to your ~/.config/i3/config:")
+                print("")
+                print("# Tamil Assistant")
+                print("bindsym $mod+y exec tamil-assistant-launcher")
+                print("for_window [class=\"TamilAssistant\"] move scratchpad")
+                print("for_window [class=\"TamilAssistant\"] resize set 400 900")
+                print("for_window [class=\"TamilAssistant\"] floating enable")
+                print("for_window [class=\"TamilAssistant\"] move position 1520 0")
+                print("")
+                print("Then reload i3 with: i3-msg reload")
+    else:
+        print(f"⚠️  i3 config not found at {i3_config}")
+        print("📋 Create ~/.config/i3/config and add the Tamil Assistant bindings")
+    
+    print("")
+    print("🎉 Tamil Assistant setup complete!")
+    print("")
+    print("📖 Next steps:")
+    print(f"1. Edit {config_file} and add your Google Gemini API key")
+    print("2. Add the i3 bindings to your ~/.config/i3/config (see above)")
+    print("3. Reload i3: i3-msg reload")
+    print("4. Launch Tamil Assistant with Mod+Y")
+
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Tamil Learning Assistant')
+    parser.add_argument('--setup', action='store_true', 
+                       help='Set up user configuration files')
+    args = parser.parse_args()
+    
+    if args.setup:
+        setup_user_config()
+        return
+    
     # Allow Ctrl+C to quit
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
