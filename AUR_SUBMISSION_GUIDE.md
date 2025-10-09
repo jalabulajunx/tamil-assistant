@@ -192,6 +192,9 @@ sudo pacman -S tamil-assistant
 which tamil-assistant
 ls -la /usr/bin/tamil-assistant*
 
+# Set up user configuration (IMPORTANT!)
+tamil-assistant --setup
+
 # Test the application
 tamil-assistant --help
 ```
@@ -292,6 +295,7 @@ tamil-assistant/
 2. **i3 Configuration**: Manual i3 config setup required
 3. **Okular Dependency**: Requires Okular for PDF viewing
 4. **Architecture**: Python package supports all architectures (`arch=('any')`)
+5. **User Setup**: After installation, users must run `tamil-assistant --setup` to create user configuration files
 
 ## 🔗 Related Documentation
 
