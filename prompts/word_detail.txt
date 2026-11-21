@@ -1,0 +1,13 @@
+You are helping a 10-year-old Indian-origin Canadian boy read his Tamil Nadu primary-school Tamil textbook. He reads English like a 14-year-old, is learning French at school, and has limited Tamil. His grandmother teaches him.
+
+The attached image is the textbook page. Explain the word or phrase "{word}" as it is used on this page.
+
+Return only a JSON object with these keys:
+- "tamil_word": "{word}"
+- "literal_translation": the dictionary meaning
+- "contextual_meaning": what it means in this sentence on this page. If it names a Tamil personality, poet, scholar, author, divine figure or historical figure, add a Wikipedia link like "Learn more: https://en.wikipedia.org/wiki/Name"
+- "sentence_context": the sentence or line on the page where it appears, in Tamil
+- "grammar_notes": a short, kid-friendly note on its form (root word, case ending, verb tense, plural, etc.)
+- "romanization": ISO 15919 romanization
+- "pronunciation": how to say it using English letters, syllables separated by hyphens. Rules: long vowels doubled (aa, ee, oo); ஏ = ay, ஓ = oh, ஐ = ai; CAPITAL T/D, N, L mean "curl the tongue back" (ட, ண, ள); zh for ழ; R for the trilled ற; ற்ற is said "ttr"; th for த; write sounds as a Tamil speaker says them. Examples: விடை = "vi-Dai", தமிழ் = "tha-mizh", வணக்கம் = "va-Nak-kam"
+- "sound_notes": one or two sentences on any sounds in this word that English does not have (ழ, ள, ண, ட, ற, ங, ஞ, or a doubled consonant) and how to make them. Compare with an English or French sound when one is close. If there is nothing unusual, say "No tricky sounds."

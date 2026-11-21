@@ -13,12 +13,23 @@ import logging
 import os
 import argparse
 import shutil
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from tamil_assistant.config_manager import get_config
 from tamil_assistant.okular_interface import OkularInterface
 from tamil_assistant.gemini_client import GeminiClient, TamilWord
+from tamil_assistant.result_cache import ResultCache
+
+
+def esc(text):
+    """Escape model text for Pango markup"""
+    return GLib.markup_escape_text(text or "")
+
+
+SAY_IT_KEY = ("Say-it guide: aa ee oo = long vowels · CAPITALS T D N L = curl your "
+              "tongue back · zh = ழ · R = rolled ற · th = soft t")
 
 class TamilSidePanel(Gtk.Window):
     def __init__(self):
@@ -43,12 +54,17 @@ class TamilSidePanel(Gtk.Window):
         # Initialize interfaces
         self.okular = OkularInterface()
         self.gemini = GeminiClient()  # Now reads from config automatically
+        self.cache = ResultCache()
 
         # State
         self.current_words = []
-        self.current_page_image = None
+        self.current_page_image = None   # rendered lazily; None when the list came from cache
+        self.current_pdf_path = None
         self.current_file_name = None
         self.current_page_number = None
+        self.current_page_key = None     # cache key for the page being shown
+        self.selected_word = None
+        self._details_in_flight = set()
 
         # Setup window
         self.setup_window()
@@ -196,6 +212,13 @@ class TamilSidePanel(Gtk.Window):
         list_label.set_halign(Gtk.Align.START)
         vbox.pack_start(list_label, False, False, 0)
 
+        say_key = Gtk.Label()
+        say_key.set_markup(f"<small><i>{esc(SAY_IT_KEY)}</i></small>")
+        say_key.set_halign(Gtk.Align.START)
+        say_key.set_line_wrap(True)
+        say_key.set_xalign(0)
+        vbox.pack_start(say_key, False, False, 0)
+
         scrolled_list = Gtk.ScrolledWindow()
         scrolled_list.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scrolled_list.set_min_content_height(300)
@@ -282,82 +305,99 @@ class TamilSidePanel(Gtk.Window):
         )
 
     def set_status(self, message, is_loading=False):
-        """Update status label"""
+        """Update status label (main thread only; use _status from workers)"""
         self.status.set_text(message)
         if is_loading:
             self.spinner.start()
         else:
             self.spinner.stop()
+        return False
+
+    def _status(self, message, is_loading=False):
+        """Thread-safe status update"""
+        GLib.idle_add(self.set_status, message, is_loading)
+
+    def _run_in_background(self, target, *args):
+        """Run blocking work (rendering, Gemini calls) off the UI thread"""
+        threading.Thread(target=target, args=args, daemon=True).start()
+
+    def _page_image(self):
+        """The current page image, rendering it (just this one page) if needed. Worker thread."""
+        if self.current_page_image is None:
+            self.current_page_image = self.okular.render_page_to_image(
+                self.current_pdf_path, self.current_page_number)
+            self.logger.info("Rendered page image")
+        return self.current_page_image
+
+    def _set_current_page(self, pdf_path, page_num):
+        """Remember which page is shown; drop the old page image if it changed"""
+        if (pdf_path, page_num) != (self.current_pdf_path, self.current_page_number):
+            self.current_page_image = None
+        self.current_pdf_path = pdf_path
+        self.current_file_name = os.path.basename(pdf_path)
+        self.current_page_number = page_num
+        self.current_page_key = self.cache.page_key(
+            pdf_path, page_num, self.gemini.model, self.config.get_page_analysis_prompt())
 
     def on_analyze_clicked(self, button):
         """Analyze current page in Okular"""
         self.set_status("Getting current page...", True)
         self.analyze_btn.set_sensitive(False)
-
-        # Run in background thread
-        GLib.idle_add(self._do_analyze)
-
-    def _do_analyze(self):
-        """Background task: analyze page"""
         try:
-            # Get current page from Okular
+            # D-Bus calls to Okular stay on the main thread
             page_num = self.okular.get_current_page()
             pdf_path = self.okular.get_current_document()
-            
-            # Extract file name for logging and display
-            self.current_file_name = os.path.basename(pdf_path)
-            self.current_page_number = page_num  # Convert to 1-indexed for display
-            
+            self._set_current_page(pdf_path, page_num)
+        except Exception as e:
+            self.logger.error(f"Analysis error: {e}")
+            self.set_status(f"❌ Error: {e}")
+            self.analyze_btn.set_sensitive(True)
+            return
+        self._run_in_background(self._do_analyze)
+
+    def _do_analyze(self):
+        """Worker thread: word list for the current page, from cache or Gemini"""
+        try:
             self.logger.info(f"Starting page analysis - File: {self.current_file_name}, Page: {self.current_page_number}")
-            self.logger.info(f"Full PDF path: {pdf_path}")
+            self.logger.info(f"Full PDF path: {self.current_pdf_path}")
 
-            self.set_status(f"Rendering page {self.current_page_number}...", True)
-
-            # Render page to image
-            self.current_page_image = self.okular.render_page_to_image(pdf_path, page_num)
-            self.logger.info("Page rendered to image successfully")
-
-            self.set_status("Analyzing with Gemini...", True)
-
-            # Send to Gemini and log token usage
-            words, tokens_sent, tokens_received = self.gemini.analyze_page(self.current_page_image)
-            
-            self.logger.info(f"Gemini analysis complete - Tokens sent: {tokens_sent}, Tokens received: {tokens_received}")
-            self.logger.info(f"Found {len(words)} Tamil words on page {self.current_page_number}")
+            words = self.cache.get_page(self.current_page_key)
+            if words is not None:
+                self.logger.info(f"Page {self.current_page_number} loaded from cache ({len(words)} entries)")
+                source = "saved"
+            else:
+                self._status(f"Rendering page {self.current_page_number}...", True)
+                image = self._page_image()
+                self._status("Analyzing with Gemini...", True)
+                words, tokens_sent, tokens_received = self.gemini.analyze_page(image)
+                self.logger.info(f"Gemini analysis complete - Tokens sent: {tokens_sent}, Tokens received (incl. thinking): {tokens_received}")
+                self.cache.put_page(self.current_page_key, words,
+                                    self.current_file_name, self.current_page_number)
+                source = "new"
 
             self.current_words = words
+            n_words = sum(1 for w in words if not w.is_special)
+            self.logger.info(f"Found {n_words} Tamil words on page {self.current_page_number}")
 
-            # Update UI
             GLib.idle_add(self._update_word_list, words)
             GLib.idle_add(self._update_context_display)
-
-            self.set_status(f"✅ Found {len(words)} words")
+            self._status(f"✅ {n_words} words" + (" (saved earlier, no cost)" if source == "saved" else ""))
 
         except Exception as e:
             self.logger.error(f"Analysis error: {e}")
-            self.set_status(f"❌ Error: {str(e)}")
+            self._status(f"❌ Error: {e}")
         finally:
-            self.analyze_btn.set_sensitive(True)
-
-        return False  # Don't repeat
+            GLib.idle_add(self.analyze_btn.set_sensitive, True)
 
     def _update_word_list(self, words):
         """Update word list in UI"""
-        # Clear existing
         for child in self.word_listbox.get_children():
             self.word_listbox.remove(child)
 
-        # Separate regular words from poem summary
-        regular_words = []
-        poem_summary = None
-        
-        for word in words:
-            if word.tamil_word == "POEM_SUMMARY":
-                poem_summary = word
-            else:
-                regular_words.append(word)
+        regular_words = [w for w in words if not w.is_special]
+        special = [w for w in words if w.is_special]
+        tamil_font = self.config.get_tamil_font()
 
-        # Add regular words first
         for word in regular_words:
             row = Gtk.ListBoxRow()
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
@@ -366,32 +406,30 @@ class TamilSidePanel(Gtk.Window):
             box.set_margin_top(3)
             box.set_margin_bottom(3)
 
-            # Tamil word
             tamil_label = Gtk.Label()
-            tamil_label.set_markup(f"<span font_family='{self.config.get_tamil_font()}' size='large'><b>{word.tamil_word}</b></span>")
+            tamil_label.set_markup(f"<span font_family='{tamil_font}' size='large'><b>{esc(word.tamil_word)}</b></span>")
             tamil_label.set_halign(Gtk.Align.START)
+            box.pack_start(tamil_label, False, False, 0)
 
-            # Literal translation
+            if word.pronunciation:
+                say_label = Gtk.Label()
+                say_label.set_markup(f"<span foreground='#8e44ad'>🗣 {esc(word.pronunciation)}</span>")
+                say_label.set_halign(Gtk.Align.START)
+                box.pack_start(say_label, False, False, 0)
+
             literal_label = Gtk.Label()
-            literal_label.set_markup(f"<small>{word.literal_translation}</small>")
+            literal_label.set_markup(f"<small>{esc(word.literal_translation)}</small>")
             literal_label.set_halign(Gtk.Align.START)
             literal_label.set_line_wrap(True)
-
-            box.pack_start(tamil_label, False, False, 0)
             box.pack_start(literal_label, False, False, 0)
 
             row.add(box)
-            row.word_data = word  # Store word data
-
+            row.word_data = word
             self.word_listbox.add(row)
 
-        # Add poem summary if present
-        if poem_summary:
-            # Add separator
-            separator = Gtk.Separator()
-            self.word_listbox.add(separator)
-            
-            # Add poem summary with special styling
+        titles = {"POEM_SUMMARY": "📖 Poem Summary", "PICTURE_NOTE": "🖼 About the Pictures"}
+        for entry in special:
+            self.word_listbox.add(Gtk.Separator())
             row = Gtk.ListBoxRow()
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
             box.set_margin_start(8)
@@ -399,24 +437,20 @@ class TamilSidePanel(Gtk.Window):
             box.set_margin_top(8)
             box.set_margin_bottom(8)
 
-            # Poem summary title
             title_label = Gtk.Label()
-            title_label.set_markup("<b>📖 Page Summary</b>")
+            title_label.set_markup(f"<b>{titles.get(entry.tamil_word, 'Note')}</b>")
             title_label.set_halign(Gtk.Align.START)
 
-            # Poem summary content
             summary_label = Gtk.Label()
-            summary_label.set_markup(f"<small>{poem_summary.contextual_meaning}</small>")
+            summary_label.set_markup(f"<small>{esc(entry.contextual_meaning)}</small>")
             summary_label.set_halign(Gtk.Align.START)
             summary_label.set_line_wrap(True)
             summary_label.set_selectable(True)
 
             box.pack_start(title_label, False, False, 0)
             box.pack_start(summary_label, False, False, 0)
-
             row.add(box)
-            row.word_data = poem_summary  # Store word data
-
+            row.word_data = entry
             self.word_listbox.add(row)
 
         self.word_listbox.show_all()
@@ -426,92 +460,114 @@ class TamilSidePanel(Gtk.Window):
         """Update the context display with file name and page number"""
         if self.current_file_name and self.current_page_number:
             context_text = f"📄 {self.current_file_name} - Page {self.current_page_number}"
-            self.context_label.set_markup(f"<small><i>{context_text}</i></small>")
+            self.context_label.set_markup(f"<small><i>{esc(context_text)}</i></small>")
         else:
             self.context_label.set_markup("<small><i>No document loaded</i></small>")
         return False
 
     def on_lookup_clicked(self, button):
-        """Lookup selected text"""
+        """Lookup text selected in Okular"""
         self.set_status("Getting selected text...", True)
         self.lookup_btn.set_sensitive(False)
-
-        GLib.idle_add(self._do_lookup)
-
-    def _do_lookup(self):
-        """Background task: lookup word"""
         try:
-            # Get selected text
             selected_text = self.okular.get_selected_text()
-
             if not selected_text:
                 self.logger.warning("No text selected in Okular for lookup")
                 self.set_status("⚠️ No text selected in Okular")
                 self.lookup_btn.set_sensitive(True)
-                return False
-
-            self.logger.info(f"Starting word lookup - Selected text: '{selected_text}'")
-            self.set_status(f"Looking up: {selected_text}", True)
-
-            # Get context if we don't have current page image
-            if not self.current_page_image:
-                page_num = self.okular.get_current_page()
-                pdf_path = self.okular.get_current_document()
-                self.current_page_image = self.okular.render_page_to_image(pdf_path, page_num)
-                self.logger.info("Rendered page image for lookup context")
-
-            # Send to Gemini and log token usage
-            word, tokens_sent, tokens_received = self.gemini.lookup_word(selected_text, self.current_page_image)
-            
-            self.logger.info(f"Word lookup complete - Tokens sent: {tokens_sent}, Tokens received: {tokens_received}")
-
-            if word:
-                self.logger.info(f"Found word: {word.tamil_word} - {word.literal_translation}")
-                GLib.idle_add(self._show_word_detail, word)
-                self.set_status("✅ Lookup complete")
-            else:
-                self.logger.warning(f"No results found for: {selected_text}")
-                self.set_status("❌ No results")
-
+                return
+            page_num = self.okular.get_current_page()
+            pdf_path = self.okular.get_current_document()
+            self._set_current_page(pdf_path, page_num)
         except Exception as e:
             self.logger.error(f"Lookup error: {e}")
-            self.set_status(f"❌ Error: {str(e)}")
-        finally:
+            self.set_status(f"❌ Error: {e}")
             self.lookup_btn.set_sensitive(True)
+            return
 
-        return False
+        self.logger.info(f"Starting word lookup - Selected text: '{selected_text}'")
+        self.set_status(f"Looking up: {selected_text}", True)
+        word = TamilWord(selected_text)
+        self.selected_word = word
+        self._show_word_detail(word)
+        self._run_in_background(self._fetch_detail, word, True)
 
     def on_word_selected(self, listbox, row):
-        """Word selected from list"""
-        if row and hasattr(row, 'word_data'):
-            self._show_word_detail(row.word_data)
+        """Word selected from list: show what we have, fetch details if missing"""
+        if not (row and hasattr(row, 'word_data')):
+            return
+        word = row.word_data
+        self.selected_word = word
+        self._show_word_detail(word)
+        if not word.is_special and not word.has_detail and word.tamil_word not in self._details_in_flight:
+            self.set_status(f"Getting details for {word.tamil_word}...", True)
+            self._run_in_background(self._fetch_detail, word, False)
+
+    def _fetch_detail(self, word, from_selection):
+        """Worker thread: fill in a word's details from cache or Gemini"""
+        self._details_in_flight.add(word.tamil_word)
+        try:
+            detail = self.cache.get_detail(self.current_page_key, word.tamil_word)
+            if detail:
+                self.logger.info(f"Details for {word.tamil_word} loaded from cache")
+            else:
+                image = self._page_image()
+                detail, tokens_sent, tokens_received = self.gemini.lookup_word(word.tamil_word, image)
+                self.logger.info(f"Word lookup complete - Tokens sent: {tokens_sent}, Tokens received (incl. thinking): {tokens_received}")
+                if not detail:
+                    self._status(f"❌ No details for {word.tamil_word}")
+                    return
+                # Keep the key as the word we asked about, so the cache finds it again
+                detail.tamil_word = word.tamil_word
+                self.cache.put_detail(self.current_page_key, detail,
+                                      self.config.get_word_lookup_prompt())
+            word.merge_detail(detail)
+            self.logger.info(f"Found word: {word.tamil_word} - {word.literal_translation}")
+            if self.selected_word is word:
+                GLib.idle_add(self._show_word_detail, word)
+            self._status("✅ Details ready")
+        except Exception as e:
+            self.logger.error(f"Lookup error: {e}")
+            self._status(f"❌ Error: {e}")
+        finally:
+            self._details_in_flight.discard(word.tamil_word)
+            if from_selection:
+                GLib.idle_add(self.lookup_btn.set_sensitive, True)
 
     def _show_word_detail(self, word):
         """Display word details"""
         tamil_font = self.config.get_tamil_font()
-        
-        # Make URLs clickable
-        contextual_meaning = self._make_urls_clickable(word.contextual_meaning)
-        
-        # Debug logging
+
+        if word.is_special:
+            self.detail_view.set_markup(f"<span foreground='#3498db'>{esc(word.contextual_meaning)}</span>")
+            return False
+
         self.logger.info(f"Showing word detail for: {word.tamil_word}")
-        self.logger.info(f"Original contextual meaning: {word.contextual_meaning}")
-        self.logger.info(f"Processed contextual meaning: {contextual_meaning}")
 
-        detail_html = f"""<span font_family='{tamil_font}' size='xx-large'><b>{word.tamil_word}</b></span>
+        parts = [f"<span font_family='{tamil_font}' size='xx-large'><b>{esc(word.tamil_word)}</b></span>"]
+        if word.pronunciation:
+            parts.append(f"<b>Say it:</b>\n<span foreground='#8e44ad' size='large'>🗣 {esc(word.pronunciation)}</span>")
+        if word.romanization:
+            parts.append(f"<b>Romanized:</b>\n<span foreground='#7f8c8d'>{esc(word.romanization)}</span>")
+        if word.sound_notes:
+            parts.append(f"<b>Tricky Sounds:</b>\n<span foreground='#8e44ad'>{esc(word.sound_notes)}</span>")
+        if word.literal_translation:
+            parts.append(f"<b>Literal Translation:</b>\n<span foreground='#e74c3c'>{esc(word.literal_translation)}</span>")
 
-<b>Literal Translation:</b>
-<span foreground='#e74c3c'>{word.literal_translation}</span>
+        if word.has_detail:
+            if word.contextual_meaning:
+                contextual = self._make_urls_clickable(esc(word.contextual_meaning))
+                parts.append(f"<b>Contextual Meaning:</b>\n<span foreground='#3498db'>{contextual}</span>")
+            if word.grammar_notes:
+                parts.append(f"<b>Grammar:</b>\n<span foreground='#27ae60'>{esc(word.grammar_notes)}</span>")
+            if word.sentence_context:
+                parts.append(f"<b>Sentence Context:</b>\n<span style='italic' foreground='#7f8c8d'>{esc(word.sentence_context)}</span>")
+        else:
+            parts.append("<i>Loading details…</i>")
 
-<b>Contextual Meaning:</b>
-<span foreground='#3498db'>{contextual_meaning}</span>
-
-<b>Sentence Context:</b>
-<span style='italic' foreground='#7f8c8d'>{word.sentence_context}</span>"""
-
-        self.detail_view.set_markup(detail_html)
+        self.detail_view.set_markup("\n\n".join(parts))
         return False
-    
+
     def _make_urls_clickable(self, text):
         """Convert URLs in text to clickable HTML links"""
         import re
@@ -541,7 +597,7 @@ class TamilSidePanel(Gtk.Window):
             self.logger.info(f"Opened URL: {url}")
         except Exception as e:
             self.logger.error(f"Failed to open URL {url}: {e}")
-            self.set_status(f"❌ Failed to open URL")
+            self.set_status("❌ Failed to open URL")
     
     def _on_detail_activate_link(self, label, uri):
         """Handle link clicks in detail view"""

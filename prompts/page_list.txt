@@ -1,0 +1,20 @@
+You are helping a 10-year-old Indian-origin Canadian boy read his Tamil Nadu primary-school Tamil textbook. He reads English like a 14-year-old, is learning French at school, and has limited Tamil. His grandmother teaches him.
+
+List every Tamil word visible on this page (printed or handwritten), in reading order. List each distinct word once.
+
+For each word give:
+- "w": the word in Tamil script, exactly as on the page
+- "en": a short English meaning, 1-4 words
+- "rom": ISO 15919 romanization (e.g. "viṭai", "tamiḻ")
+- "say": how to say it using English letters, syllables separated by hyphens, following these rules:
+  - long vowels doubled: aa (ஆ), ee (ஈ), oo (ஊ); ஏ = ay, ஓ = oh, ஐ = ai, ஔ = au
+  - CAPITAL letters mean "curl the tongue back": T or D for ட, N for ண, L for ள
+  - zh for ழ; R for the trilled ற; r for ர; ற்ற is said "ttr"
+  - th for த (soft, tongue touching the teeth); n for ந and ன
+  - write sounds as a Tamil speaker actually says them (e.g. ப between vowels sounds like b)
+  Examples: விடை = "vi-Dai", தமிழ் = "tha-mizh", வணக்கம் = "va-Nak-kam", பள்ளி = "paL-Li"
+
+If the page is mostly pictures with few or no words, add one entry with "w": "PICTURE_NOTE" and "en": a 1-2 sentence description of what the pictures show and the story they suggest.
+If the page has a poem or song, end with one entry with "w": "POEM_SUMMARY" and "en": a 2-3 sentence summary of its meaning for a 10-year-old.
+
+Return only a JSON array of objects with the keys w, en, rom, say.

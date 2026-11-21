@@ -163,15 +163,23 @@ word_lookup_prompt_file = prompts/word_lookup.txt
         return self.config.get('okular', 'dbus_path', fallback='/okular')
 
     # Prompt Configuration
+    # The page prompt returns a compact word list (word, meaning, pronunciation);
+    # details are fetched per word on click. These use new file names on purpose:
+    # older installs copied page_analysis.txt / word_lookup.txt into the user's
+    # config dir, and those copies would otherwise shadow the new prompts.
     def get_page_analysis_prompt(self):
-        """Get page analysis prompt"""
-        prompt_file = self.config.get('prompts', 'page_analysis_prompt_file', fallback='prompts/page_analysis.txt')
+        """Get page word-list prompt"""
+        prompt_file = self.config.get('prompts', 'page_list_prompt_file', fallback='prompts/page_list.txt')
         return self._load_prompt_file(prompt_file)
 
     def get_word_lookup_prompt(self):
-        """Get word lookup prompt template"""
-        prompt_file = self.config.get('prompts', 'word_lookup_prompt_file', fallback='prompts/word_lookup.txt')
+        """Get word detail prompt template (formatted with word=...)"""
+        prompt_file = self.config.get('prompts', 'word_detail_prompt_file', fallback='prompts/word_detail.txt')
         return self._load_prompt_file(prompt_file)
+
+    def get_request_timeout(self):
+        """Seconds to wait for a Gemini response"""
+        return self.config.getint('gemini', 'timeout', fallback=120)
 
     def _load_prompt_file(self, prompt_file):
         """Load prompt from file"""
@@ -195,9 +203,15 @@ word_lookup_prompt_file = prompts/word_lookup.txt
             if prompt_path.exists():
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     return f.read().strip()
-            
+
+            # Try next to the code (running from a source checkout)
+            source_prompt_path = Path(__file__).resolve().parent / "prompts" / Path(prompt_file).name
+            if source_prompt_path.exists():
+                with open(source_prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+
             # Fall back to defaults
-            if 'page_analysis' in prompt_file:
+            if 'page_analysis' in prompt_file or 'page_list' in prompt_file:
                 return self._get_default_page_prompt()
             else:
                 return self._get_default_word_prompt()
@@ -205,7 +219,7 @@ word_lookup_prompt_file = prompts/word_lookup.txt
         except Exception as e:
             print(f"Warning: Could not load prompt file {prompt_file}: {e}")
             # Fall back to defaults
-            if 'page_analysis' in prompt_file:
+            if 'page_analysis' in prompt_file or 'page_list' in prompt_file:
                 return self._get_default_page_prompt()
             else:
                 return self._get_default_word_prompt()
