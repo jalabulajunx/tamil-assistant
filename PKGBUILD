@@ -24,7 +24,7 @@ optdepends=(
     'dmenu: Alternative application launcher'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/jalabulajunx/tamil-assistant/archive/v$pkgver.tar.gz")
-sha256sums=('4a7218e8fb6ab9983229447ace0a1296340920ff60d35e5aae0a194de980d4e4')
+sha256sums=('e176a8fcb13042795d8c1dcfc4ce5d676b46f2bbbb587dfb2e83c2892c202ecc')
 install=tamil-assistant.install
 
 package() {
